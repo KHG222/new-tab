@@ -1,0 +1,602 @@
+12am-12pm-Morning
+12pm to sunset-Afternoon
+Sunset to 12am-Night
+Use System time or location/time zone to figure out which word from above to use.
+
+
+
+
+
+
+let currentTime=600;
+
+function formatTime(minutes){
+const hours=Math.floor(minutes / 60);
+const mins=minutes % 60;
+const period=hours >= 12 ? "PM" : "AM";
+const displayHours=hours % 12 || 12;
+return`${displayHours}:${mins.toString().padStart(2, "0")} ${period}`;
+}
+
+function updateClock(){
+const clock=document.getElementById("clock");
+clock.textContent=`Current Time: ${formatTime(currentTime)}`;
+}
+if (currentTime >= 1440){//(12AM)
+currentTime -= 1440;
+}
+
+if (currentTime >= 1410){//(11:30PM)
+SimulatorOver=true;
+eventMessage.textContent="The day is over. I'm tired. Time for bed.";
+updateClock();
+return;
+}
+
+
+
+
+function startTime() {
+  Var today = new Date();
+  Var h = today.getHours();
+  Var m = today.getMinutes();
+  Var s = today.getSeconds();
+  m = checkTime(m);
+  s = checkTime(s);
+  document.getElementById('txt').innerHTML =  h + ":" + m + ":" + s;
+  setTimeout(startTime, 1000);
+}
+
+function checkTime(i) {
+  if (i < 10) {i = "0" + i};  // add zero in front of numbers < 10
+  return i;
+}
+
+
+
+getFullYear(): Returns the year (e.g., 2025).
+getMonth(): Returns the month (0-11, where 0 is January).
+getDate(): Returns the day of the month (1-31).
+getHours(), getMinutes(), getSeconds(), getMilliseconds(): Return respective time components.
+getDay(): Returns the day of the week (0-6, where 0 is Sunday).
+getTime(): Returns the number of milliseconds since the epoch.
+
+function getTimeOfDay() {
+  return new Promise((resolve) => {
+    const hour = new Date().getHours();
+
+    if (hour < 12) {
+      resolve("Morning");
+    } else if (hour < 18) {
+      resolve("Afternoon");
+    } else {
+      resolve("Night");
+    }
+  });
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Time of Day</title>
+</head>
+<body>
+
+  <h1 id="timeText">Loading...</h1>
+
+  <script>
+    // Main function
+    async function getTimeOfDay() {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      // Default fallback sunset time (6:00 PM)
+      const fallbackSunsetHour = 18;
+      const fallbackSunsetMinute = 0;
+
+      // Try to get geolocation + real sunset time
+      try {
+        const position = await new Promise((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
+        );
+
+        const { latitude, longitude } = position.coords;
+
+        const response = await fetch(`https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`);
+        const data = await response.json();
+
+        const sunsetUTC = new Date(data.results.sunset);
+        const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const sunsetLocal = new Date(sunsetUTC.toLocaleString("en-US", { timeZone }));
+
+        const sunsetHour = sunsetLocal.getHours();
+        const sunsetMinute = sunsetLocal.getMinutes();
+
+        // Use real sunset
+        return determineTimeOfDay(currentHour, currentMinute, sunsetHour, sunsetMinute);
+
+      } catch (error) {
+        console.warn("Geolocation or API failed, using fallback.", error);
+
+        // Use fallback sunset
+        return determineTimeOfDay(currentHour, currentMinute, fallbackSunsetHour, fallbackSunsetMinute);
+      }
+    }
+
+    // Logic to determine time of day
+    function determineTimeOfDay(currentHour, currentMinute, sunsetHour, sunsetMinute) {
+      if (currentHour < 12) {
+        return "Morning";
+      } else if (currentHour < sunsetHour || (currentHour === sunsetHour && currentMinute < sunsetMinute)) {
+        return "Afternoon";
+      } else {
+        return "Night";
+      }
+    }
+
+    // Update the page
+    getTimeOfDay().then((timeOfDay) => {
+      document.getElementById("timeText").textContent = `It is currently: ${timeOfDay}`;
+    }).catch((error) => {
+      document.getElementById("timeText").textContent = "Could not determine time of day.";
+      console.error(error);
+    });
+  </script>
+
+</body>
+</html>
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Smart Time of Day</title>
+</head>
+<body>
+
+  <h1 id="timeText">Loading...</h1>
+
+  <script>
+    let currentLabel = null;
+    let checkInterval = null;
+    let sunsetHour = 18; // fallback
+    let sunsetMinute = 0;
+
+    // Get time-of-day label based on current time + sunset
+    function determineTimeOfDay(now) {
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      if (hour < 12) {
+        return "Morning";
+      } else if (hour < sunsetHour || (hour === sunsetHour && minute < sunsetMinute)) {
+        return "Afternoon";
+      } else {
+        return "Night";
+      }
+    }
+
+    // Check if we're near noon or sunset (±15 minutes)
+    function isNearTransition(now) {
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      const totalMinutes = hour * 60 + minute;
+      const noonMinutes = 12 * 60;
+      const sunsetMinutes = sunsetHour * 60 + sunsetMinute;
+
+      return (
+        Math.abs(totalMinutes - noonMinutes) <= 15 ||
+        Math.abs(totalMinutes - sunsetMinutes) <= 15
+      );
+    }
+
+    // Main update function
+    function updateTimeText(force = false) {
+      const now = new Date();
+      const label = determineTimeOfDay(now);
+
+      if (force || label !== currentLabel) {
+        currentLabel = label;
+        document.getElementById("timeText").textContent = `It is currently: ${label}`;
+        console.log("Updated label:", label);
+      }
+
+      // If we're NOT near a transition, stop checking frequently
+      if (!isNearTransition(now) && checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
+
+        // Re-check again in 30 minutes
+        setTimeout(startSmartChecking, 30 * 60 * 1000);
+      }
+    }
+
+    // Start checking every minute if near transition
+    function startSmartChecking() {
+      const now = new Date();
+      if (isNearTransition(now)) {
+        updateTimeText(true); // force update
+
+        if (!checkInterval) {
+          checkInterval = setInterval(() => updateTimeText(), 60 * 1000); // every minute
+        }
+      } else {
+        // Not near a transition — do a quick check and set timeout to recheck later
+        updateTimeText();
+        setTimeout(startSmartChecking, 30 * 60 * 1000); // check again in 30 mins
+      }
+    }
+
+    // Get sunset time from API or use fallback
+    function fetchSunsetAndStart() {
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(`https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`);
+          const data = await response.json();
+
+          const sunsetUTC = new Date(data.results.sunset);
+          const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const sunsetLocal = new Date(sunsetUTC.toLocaleString("en-US", { timeZone }));
+
+          sunsetHour = sunsetLocal.getHours();
+          sunsetMinute = sunsetLocal.getMinutes();
+
+          console.log(`Sunset at ${sunsetHour}:${sunsetMinute}`);
+        } catch (error) {
+          console.warn("Using fallback sunset time (6:00 PM)");
+        } finally {
+          startSmartChecking(); // start after we know sunset
+        }
+      }, (error) => {
+        console.warn("Location failed, using fallback sunset.");
+        startSmartChecking();
+      });
+    }
+
+    // Start the process
+    fetchSunsetAndStart();
+  </script>
+
+</body>
+</html>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Persistent Time of Day</title>
+</head>
+<body>
+  <h1 id="timeText">Loading...</h1>
+
+  <script>
+var currentLabel = null;
+var checkInterval = null;
+
+    // Keys for localStorage
+const STORAGE_KEY = 'timeOfDayData';
+
+    // Default fallback times (6 AM sunrise, 6 PM sunset)
+var sunriseHour = 6;
+var sunriseMinute = 0;
+var sunsetHour = 18;
+var sunsetMinute = 0;
+
+    // Helper: save data to localStorage
+function saveToStorage(label, sunrise, sunset, dateStr) {
+const data = {
+label,
+sunrise,
+sunset,
+date: dateStr
+};
+localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+    // Helper: load data from localStorage
+    function loadFromStorage() {
+      const dataStr = localStorage.getItem(STORAGE_KEY);
+      if (!dataStr) return null;
+      try {
+        return JSON.parse(dataStr);
+      } catch {
+        return null;
+      }
+    }
+// Determine label based on sunrise, sunset, and current time
+    function determineTimeOfDay(now) {
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+
+      // Convert times to total minutes for easier comparison
+      const nowMins = hour * 60 + minute;
+      const sunriseMins = sunriseHour * 60 + sunriseMinute;
+      const noonMins = 12 * 60;
+      const sunsetMins = sunsetHour * 60 + sunsetMinute;
+
+      if (nowMins >= sunriseMins && nowMins < noonMins) {
+        return "Morning";
+      } else if (nowMins >= noonMins && nowMins < sunsetMins) {
+        return "Afternoon";
+      } else {
+        // Night is from sunset to sunrise (overnight)
+        return "Night";
+      }
+    }
+
+    // Update UI and save state
+    function updateLabelAndSave(now) {
+      const label = determineTimeOfDay(now);
+
+      if (label !== currentLabel) {
+        currentLabel = label;
+        document.getElementById("timeText").textContent = `It is currently: ${label}`;
+
+        // Save label and times with today's date
+        const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
+        saveToStorage(label, { hour: sunriseHour, minute: sunriseMinute }, { hour: sunsetHour, minute: sunsetMinute }, today);
+
+        console.log(`Updated label: ${label} (saved to storage)`);
+      }
+    }
+
+    // Fetch sunrise and sunset, then start interval
+    function fetchSunriseSunsetAndStart() {
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const response = await fetch(`https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`);
+          const data = await response.json();
+
+          const sunriseUTC = new Date(data.results.sunrise);
+          const sunsetUTC = new Date(data.results.sunset);
+          const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+          const sunriseLocal = new Date(sunriseUTC.toLocaleString("en-US", { timeZone }));
+          const sunsetLocal = new Date(sunsetUTC.toLocaleString("en-US", { timeZone }));
+
+          sunriseHour = sunriseLocal.getHours();
+          sunriseMinute = sunriseLocal.getMinutes();
+
+          sunsetHour = sunsetLocal.getHours();
+          sunsetMinute = sunsetLocal.getMinutes();
+
+          console.log(`Fetched sunrise: ${sunriseHour}:${sunriseMinute}, sunset: ${sunsetHour}:${sunsetMinute}`);
+
+          startChecking();
+        } catch (error) {
+          console.warn("API failed, using fallback times.");
+          startChecking();
+        }
+      }, (error) => {
+        console.warn("Geolocation failed, using fallback times.");
+        startChecking();
+      }, { timeout: 5000 });
+    }
+
+    // Start interval to update label every minute
+    function startChecking() {
+      updateLabelAndSave(new Date());
+
+      if (checkInterval) clearInterval(checkInterval);
+      checkInterval = setInterval(() => updateLabelAndSave(new Date()), 60 * 1000); // every minute
+    }
+
+    // Main app logic
+    function init() {
+      const savedData = loadFromStorage();
+
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+
+      if (
+        savedData &&
+        savedData.date === today &&
+        savedData.sunrise &&
+        savedData.sunset
+      ) {
+        // Use saved times and label
+        sunriseHour = savedData.sunrise.hour;
+        sunriseMinute = savedData.sunrise.minute;
+        sunsetHour = savedData.sunset.hour;
+        sunsetMinute = savedData.sunset.minute;
+
+        currentLabel = savedData.label;
+        document.getElementById("timeText").textContent = `It is currently: ${currentLabel}`;
+
+        console.log("Loaded data from storage:", savedData);
+
+        startChecking();
+      } else {
+        // Fetch fresh data
+        fetchSunriseSunsetAndStart();
+      }
+    }
+
+    init();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Key for localStorage
+const STORAGE_KEY = 'timeOfDayData';
+
+// Save time-of-day data
+function saveToStorage(label, sunrise, sunset, dateStr) {
+  const data = {
+    label,
+    sunrise,
+    sunset,
+    date: dateStr
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+// Load from localStorage
+function loadFromStorage() {
+  const dataStr = localStorage.getItem(STORAGE_KEY);
+  if (!dataStr) return null;
+  try {
+    return JSON.parse(dataStr);
+  } catch {
+    return null;
+  }
+}
+
+
+// Update UI and save label
+function updateLabelAndSave(now) {
+  const label = determineTimeOfDay(now);
+  if (label !== currentLabel) {
+    currentLabel = label;
+    const greetingElement = document.getElementById(GREETING_ID);
+    if (greetingElement) {
+      greetingElement.textContent=`${label}`;
+    }
+    const today = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    saveToStorage(label, { hour: sunriseHour, minute: sunriseMinute }, { hour: sunsetHour, minute: sunsetMinute }, today);
+  }
+}
+
+
+// Main logic
+function init() {
+  const savedData = loadFromStorage();
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+
+  if (
+    savedData &&
+    savedData.date === today &&
+    savedData.sunrise &&
+    savedData.sunset
+  ) {
+    sunriseHour = savedData.sunrise.hour;
+    sunriseMinute = savedData.sunrise.minute;
+    sunsetHour = savedData.sunset.hour;
+    sunsetMinute = savedData.sunset.minute;
+    currentLabel = savedData.label;
+    const greetingElement = document.getElementById(GREETING_ID);
+    if (greetingElement) {
+      greetingElement.textContent=`${currentLabel}`;
+    }
+    startChecking();
+  } else {
+    fetchSunriseSunsetAndStart();
+  }
+}
+
+init();
+
+
+
+
+
+
+
+
+
+function getTimeOfDay() {
+return new Promise((resolve, reject) => {
+    // Step 1: Get user's location
+navigator.geolocation.getCurrentPosition(async (position) => {
+var {latitude, longitude} = position.coords;
+
+   // Step 2: Get current time
+var now = new Date();
+var currentHour = now.getHours();
+var currentMinutes = now.getMinutes();
+
+      // Step 3: Fetch today's sunset time using latitude & longitude
+var response = await fetch(`https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`);
+var data = await response.json();
+var sunsetUTC = new Date(data.results.sunset);
+
+      // Convert sunsetUTC to local time
+var sunsetLocal = new Date(sunsetUTC.toLocaleString("en-US", { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }));
+var sunsetHour = sunsetLocal.getHours();
+var sunsetMinute = sunsetLocal.getMinutes();
+
+      // Step 4: Compare current time to rules
+let timeOfDay = "";
+if (currentHour < 12) {
+timeOfDay = "Morning";
+} else if (currentHour < sunsetHour || (currentHour === sunsetHour && currentMinutes < sunsetMinute)) {
+timeOfDay = "Afternoon";
+} else {
+timeOfDay = "Night";
+}
+
+resolve(timeOfDay);
+}, (error) => {
+reject("Unable to get location: " + error.message);
+});
+});
+}
+
+// Usage
+getTimeOfDay().then((timeOfDay) => {
+console.log("It is currently:", timeOfDay);
+}).catch((error) => {
+console.error(error);
+});
+
+    // Update text on the page
+getTimeOfDay().then((timeOfDay) => {
+document.getElementById("greeting").textContent = `It is currently: ${timeOfDay}`;
+}).catch((error) => {
+document.getElementById("greeting").textContent = "Unable to determine time of day.";
+console.error(error);
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Code Learning
+CS
+margin: top right bottom left;
+margin: top right-and-left bottom;
+margin: top-and-bottom right-and-left;
+HTML
+OL-Ordered List Type a-lowercase, Type A-uppercase, Type 1-Numbered(Default),Type i-Lowercase Roman numerals (i, ii, iii),Type I-Uppercase Roman numerals (I, II, III)
+UL-Unorder List

@@ -1,0 +1,45 @@
+*{
+color:black;
+text-align:center;
+}
+body{
+transition: background 0.5s ease;
+}
+.morning{
+background-image:url('images/Morning.jpg');
+background-size:cover;
+background-repeat:no-repeat;
+background-attachment:fixed;
+}
+.afternoon{
+background-image:url('images/Afternoon.jpg');
+background-size:cover;
+background-repeat:no-repeat;
+background-attachment:fixed;
+}
+.night{
+background-image:url('images/Night.jpg');
+background-size:cover;
+background-repeat:no-repeat;
+background-attachment:fixed;
+}
+.LinkBox{
+border:Solid black;
+border-padding:20px;
+} 
+a{
+text-decoration:none;
+}
+.mini{
+background-color:#00ffff;
+border-color:blue;
+width:50%;
+height:2px;
+border-width:5px;
+margin:9px auto 7px auto;
+}
+
+
+
+
+
