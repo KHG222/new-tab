@@ -1,0 +1,115 @@
+
+function changeBackgroundBasedOnCondition(conditionValue) {
+  document.body.className = ''; // Clear existing classes
+  document.body.classList.add(conditionValue); // Add the new one: 'morning', 'afternoon', or 'night'
+}
+
+
+function updateLabelAndSave(now) {
+  const label = determineTimeOfDay(now);
+
+  if (label !== currentLabel) {
+    currentLabel = label;
+
+    // Update the greeting in the DOM
+    document.getElementById(GREETING_ID).textContent = label;
+
+    // Update the background based on time of day
+    changeBackgroundBasedOnCondition(label.toLowerCase());
+  }
+}
+
+
+
+
+
+
+// Fetch sunrise/sunset time and start
+function fetchSunriseSunsetAndStart() {
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      let { latitude, longitude } = pos.coords;
+     let response = await fetch(`https://api.sunrise-sunset.org/json?lat=${latitude}&lng=${longitude}&formatted=0`);
+      let data = await response.json();
+
+      const sunriseUTC = new Date(data.results.sunrise);
+      const sunsetUTC = new Date(data.results.sunset);
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      const sunriseLocal = new Date(sunriseUTC.toLocaleString("en-US", { timeZone }));
+      const sunsetLocal = new Date(sunsetUTC.toLocaleString("en-US", { timeZone }));
+
+      sunriseHour = sunriseLocal.getHours();
+      sunriseMinute = sunriseLocal.getMinutes();
+      sunsetHour = sunsetLocal.getHours();
+      sunsetMinute = sunsetLocal.getMinutes();
+    } catch {
+      console.warn("API failed, using fallback sunrise/sunset times.");
+    } finally {
+      startChecking();
+    }
+  }, (error) => {
+    console.warn("Geolocation failed, using fallback times.");
+    startChecking();
+  }, { timeout: 5000 });
+}
+
+
+
+
+// Default fallback times
+let sunriseHour=6;
+let sunriseMinute=0;
+let noonHour=12;
+let noonMinute=0;
+let sunsetHour=18;
+let sunsetMinute=0;
+
+
+
+
+
+let currentLabel = null;
+let checkInterval = null;
+let GREETING_ID="greeting";
+
+
+
+
+
+
+// Determine "Morning", "Afternoon", "Night"
+function determineTimeOfDay(now) {
+let hour = now.getHours();
+let minute = now.getMinutes();
+let nowMins = hour * 60 + minute;
+let sunriseMins = sunriseHour * 60 + sunriseMinute;
+let noonMins = 12 * 60;
+let sunsetMins = sunsetHour * 60 + sunsetMinute;
+
+
+
+
+  if (nowMins >= sunriseMins && nowMins < noonMins) {
+    return "Morning";
+  } else if (nowMins >= noonMins && nowMins < sunsetMins) {
+    return "Afternoon";
+  } else {
+    return "Night";
+  }
+}
+
+
+// Start checking every minute
+function startChecking() {
+  updateLabelAndSave(new Date());
+  if (checkInterval) clearInterval(checkInterval);
+  checkInterval = setInterval(() => updateLabelAndSave(new Date()), 60 * 1000);
+}
+
+
+
+
+
+
+
